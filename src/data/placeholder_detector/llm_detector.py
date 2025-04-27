@@ -53,7 +53,19 @@ class LLMDetector(PlaceholderDetector):
             
             # 调用大模型
             try:
-                response = self.llm_client.get_structured_response(prompt)
+                # 使用新的 structured_completion 方法
+                system_message = "你是一个专业的文档分析助手，能够识别文档中需要填写的占位符位置。"
+                try:
+                    response_data = self.llm_client.structured_completion(
+                        user_message=prompt,
+                        system_message=system_message
+                    )
+                    # 直接使用返回的结构化数据
+                    response = response_data
+                except Exception as e:
+                    logger.error(f"LLM结构化响应请求失败: {e}")
+                    response = []
+                    
                 logger.debug(f"LLM返回占位符检测结果: {response}")
                 
                 # 处理响应，转换为PlaceholderInfo对象
