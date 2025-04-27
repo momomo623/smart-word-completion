@@ -60,16 +60,18 @@ class DocumentHandler:
             logger.info(f"使用 {detector.__class__.__name__} 找到 {len(detector_placeholders)} 个占位符")
             # 输出所有的占位符上下文
             for placeholder in detector_placeholders:
+                if placeholder.placeholder_type == "table":
+                    continue
                 logger.debug(f"\n当前行: {placeholder.line_text} \n 段落索引: {placeholder.paragraph_index} 文本块索引: {placeholder.run_index} 占位符: {placeholder.text} \n 上下文: {placeholder.before_text} {placeholder.after_text}")
         
         logger.info(f"总共找到 {len(placeholders)} 个占位符")
         return placeholders
     
-    def fill_neutral_term(
-        self, doc: Document, placeholder: PlaceholderInfo, neutral_term: str
-    ) -> None:
-        """用中性词填充占位符."""
-        self.filler.fill_neutral_term(doc, placeholder, neutral_term)
+    # def fill_neutral_term(
+    #     self, doc: Document, placeholder: PlaceholderInfo, neutral_term: str
+    # ) -> None:
+    #     """用中性词填充占位符."""
+    #     self.filler.fill_neutral_term(doc, placeholder, neutral_term)
     
     def generate_report(self, placeholders: List[PlaceholderInfo], output_path: Union[str, Path]) -> None:
         """生成处理报告."""

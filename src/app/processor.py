@@ -69,12 +69,12 @@ class DocumentProcessor:
             if not placeholders:
                 logger.warning("未找到任何占位符，将直接保存文档")
             else:
-                # 处理占位符
+                # 处理占位符，同时进行填充
                 placeholders = self.parser.process_placeholders(doc, placeholders)
                 logger.info("占位符处理完成")
             
             # 填充文档
-            self.filler.fill_document(doc, placeholders, output_path)
+            # self.filler.fill_document(doc, placeholders, output_path)
             
             # 准备结果
             report_path = Path(output_path).with_suffix(".md")

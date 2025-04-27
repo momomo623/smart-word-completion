@@ -41,14 +41,15 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
         # 默认占位符模式
         default_patterns = {
             "underline": rf"_{{{min_repetition},}}",  # 如 ___、_____
-            "asterisk": rf"\*{{{min_repetition},}}",  # 如 ***、*****
-            "dash": rf"-{{{min_repetition},}}",  # 如 ---、-----
-            "equal": rf"={{{min_repetition},}}",  # 如 ===、=====
-            "hash": rf"#{{{min_repetition},}}",  # 如 ###、#####
-            "bracket_empty": r"\[\s*_*\s*\]",  # 如 []、[___]、[ ]
-            "bracket_text": r"\[([^]]+)\]",  # 如 [填写]、[请输入]
-            "brace_empty": r"\{\s*_*\s*\}",  # 如 {}、{___}、{ }
-            "brace_text": r"\{([^}]+)\}",  # 如 {填写}、{请输入}
+            # 其他占位符模式 暂时不用
+            # "asterisk": rf"\*{{{min_repetition},}}",  # 如 ***、*****
+            # "dash": rf"-{{{min_repetition},}}",  # 如 ---、-----
+            # "equal": rf"={{{min_repetition},}}",  # 如 ===、=====
+            # "hash": rf"#{{{min_repetition},}}",  # 如 ###、#####
+            # "bracket_empty": r"\[\s*_*\s*\]",  # 如 []、[___]、[ ]
+            # "bracket_text": r"\[([^]]+)\]",  # 如 [填写]、[请输入]
+            # "brace_empty": r"\{\s*_*\s*\}",  # 如 {}、{___}、{ }
+            # "brace_text": r"\{([^}]+)\}",  # 如 {填写}、{请输入}
         }
         
         # 合并自定义模式与默认模式
