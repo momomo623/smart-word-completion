@@ -48,8 +48,9 @@ class DocumentFillerService:
                     logger.info(f"表格占位符 '{placeholder.text}' 直接使用表头作为填充内容")
                 else:
                     # 其他类型占位符使用大模型生成中性词
-                    neutral_term = self._get_neutral_term(placeholder)
-                
+                    # neutral_term = self._get_neutral_term(placeholder)
+                    continue
+
                 # 填充中性词
                 self.doc_filler.fill_neutral_term(doc, placeholder, neutral_term)
             except Exception as e:

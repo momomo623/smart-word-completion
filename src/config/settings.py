@@ -37,11 +37,42 @@ class LLMConfig(BaseModel):
         int(os.environ.get("TIMEOUT", "30")), 
         description="API请求超时时间(秒)"
     )
+
+    """不拆分上下文，"""
+    """
+
+你是一个专业的内容分析助手，擅长根据上下文生成精准的描述词。
+**内容**  
+<content>
+{content}
+</content>
+
+**任务要求**  
+1.生成中性描述词，作为<neutral_term>的内容。
+2.字段继承原则：优先继承前文的字段名称（如"姓名:____"直接继承"姓名"）
+3.短语压缩：对复合字段（如"入院日期"）保持完整名词短语
+4.格式过滤：忽略换行符、空格等非语义符号
+5.中性描述词总结：如果没有前序字段名称，根据上下文提取
+6.安全边界：如上下文字段不明确，请返回"???"。
+7.在分析过程中，请逐步思考，但每个步骤的描述尽量简洁（不超过10个字）。
+8.使用分隔符"####"来区分思考过程与最终答案。
+
+思考1:（先定位要描述的位置）
+思考2:（思考上下文的含义，和什么相关）
+思考3:（确定中性词）
+...
+使用分隔符“####”来区分思考过程与最终答案。
+
+```yaml
+neutral_term: "提取的中性词，如果不确定则为???"
+```
+    """
     
     # 提示词相关配置
     prompt_template: str = Field(
         os.environ.get("PROMPT_TEMPLATE", 
         """
+
 你是一个专业的内容分析助手，擅长根据上下文生成精准的描述词。
 **当前行**  
 <current_line>
@@ -109,7 +140,7 @@ class LogConfig(BaseModel):
     """日志配置."""
     
     level: str = Field(
-        os.environ.get("LOG_LEVEL", "INFO"), 
+        os.environ.get("LOG_LEVEL", "INFO"),
         description="日志级别"
     )
     format: str = Field(

@@ -64,16 +64,19 @@ class LLMClient:
         Raises:
             ValueError: 请求失败
         """
+
+        # content_txt = request.before_text + "<neutral_term>" + request.after_text
         # 格式化提示词
         prompt = self.prompt_template.format(
             line_text=request.line_text,
             before_text=request.before_text,
             after_text=request.after_text,
+            # content = content_txt,
         )
         
         try:
             print('-'*50)
-            logger.debug(f"发送请求到LLM:\n {prompt}")
+            # logger.debug(f"发送请求到LLM:\n {prompt}")
             
             # 发送请求到LLM服务
             response = self.client.chat.completions.create(
@@ -174,7 +177,7 @@ class LLMClient:
             
             # 提取响应内容
             content = response.choices[0].message.content.strip()
-            logger.debug(f"LLM返回原始内容: {content[:200]}...")
+            # logger.debug(f"LLM返回原始内容: {content[:200]}...")
             
             # 解析JSON
             try:

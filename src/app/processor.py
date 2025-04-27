@@ -69,11 +69,14 @@ class DocumentProcessor:
             if not placeholders:
                 logger.warning("未找到任何占位符，将直接保存文档")
             else:
-                # 处理占位符，同时进行填充
+                # 处理占位符，同时进行填充（除了表格）
                 placeholders = self.parser.process_placeholders(doc, placeholders)
+                # for p in  placeholders:
+                #     print(f"占位符: {p.text}, 上下文: {p.before_text} {p.after_text}")
+
                 logger.info("占位符处理完成")
             
-            # 填充文档
+            # 表格填充 、保存文档
             self.filler.fill_document(doc, placeholders, output_path)
             
             # 准备结果
