@@ -55,7 +55,10 @@ class DocumentParser:
         for placeholder in placeholders:
             if placeholder.placeholder_type == 'table':
                 # 对于表格占位符，直接使用表头作为内容
+                neutral_term = placeholder.text
+                self.document_handler.filler.fill_neutral_term(doc, placeholder, neutral_term)
                 continue
+            # 对于其他类型的占位符，使用大模型生成中性词
             # 创建LLM请求对象
             request = LLMRequest(
                 line_text=placeholder.line_text,
@@ -70,5 +73,5 @@ class DocumentParser:
             self.document_handler.filler.fill_neutral_term(doc, placeholder, neutral_term)
 
             # self.document_handler.fill_neutral_term(doc, placeholder, neutral_term)
-        
+
         return placeholders 

@@ -149,4 +149,4 @@ class DocumentFiller:
         # 记录使用的表头作为中性词，包含行号
         placeholder.neutral_term = header_text + str(row_idx)
         
-        logger.info(f"已在表格[{table_idx}]的单元格[{row_idx}, {cell_idx}]填入表头占位符: '{replacement}'")
+        logger.debug(f"已在表格[{table_idx}]的单元格[{row_idx}, {cell_idx}]填入表头占位符: '{replacement}'")

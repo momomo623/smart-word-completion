@@ -76,7 +76,7 @@ class LLMClient:
         
         try:
             print('-'*50)
-            # logger.debug(f"发送请求到LLM:\n {prompt}")
+            logger.debug(f"发送请求到LLM:\n {prompt}")
             
             # 发送请求到LLM服务
             response = self.client.chat.completions.create(
@@ -95,7 +95,7 @@ class LLMClient:
             # 解析中性词yaml
             neutral_term = self.parse_neutral_term(resp).get("neutral_term", "???")
 
-            print(f"大模型结果: {resp}")
+            logger.debug(f"大模型结果: {resp}")
             logger.info(f"获取到中性词: {neutral_term}")
             
             return neutral_term
