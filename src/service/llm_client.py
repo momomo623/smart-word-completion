@@ -4,6 +4,7 @@ import json
 import os
 from typing import Dict, List, Optional, Union, Any
 
+import yaml
 from loguru import logger
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -71,7 +72,8 @@ class LLMClient:
         )
         
         try:
-            logger.debug(f"发送请求到LLM: {request.before_text}...")
+            print('-'*50)
+            logger.debug(f"发送请求到LLM:\n {prompt}")
             
             # 发送请求到LLM服务
             response = self.client.chat.completions.create(
@@ -84,9 +86,13 @@ class LLMClient:
                 temperature=self.temperature,
                 timeout=self.timeout,
             )
-            
+
             # 提取生成的中性词
-            neutral_term = response.choices[0].message.content.strip()
+            resp = response.choices[0].message.content
+            # 解析中性词yaml
+            neutral_term = self.parse_neutral_term(resp).get("neutral_term", "???")
+
+            print(f"大模型结果: {resp}")
             logger.info(f"获取到中性词: {neutral_term}")
             
             return neutral_term
@@ -94,13 +100,41 @@ class LLMClient:
             logger.error(f"LLM请求失败: {e}")
             # 如果请求失败，返回"???"
             return "???"
-    
+
+    def   parse_neutral_term(self, resp: str) -> Dict[str, str]:
+        """解析中性词yaml.
+
+        Args:
+            llm_out: LLM输出内容
+            例如：
+            ```
+            思考1: 思考内容
+            思考2： 思考内容
+            ####
+
+            ```yaml
+            neutral_term: "提取的中性词"
+            ```
+            ```
+
+        Returns:
+            提取的中性词
+        """
+        yaml_str = resp.split("```yaml")[1].split("```")[0].strip()
+        result = yaml.safe_load(yaml_str)
+
+        assert isinstance(result, dict)
+        assert "neutral_term" in result
+
+        return result
+
+
     def get_neutral_term_batch(self, requests: List[LLMRequest]) -> List[str]:
         """批量获取中性词.
-        
+
         Args:
             requests: LLM请求模型列表
-            
+
         Returns:
             生成的中性词列表
         """
@@ -109,7 +143,7 @@ class LLMClient:
             neutral_term = self.get_neutral_term(req)
             results.append(neutral_term)
         return results
-        
+
     def get_structured_response(self, prompt: str) -> Any:
         """获取结构化响应数据（例如JSON）.
         
