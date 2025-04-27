@@ -1,6 +1,3 @@
-
-表格恢复原样，其他看情况
-
 难点/问题
 1. 占位符格式：普通下划线、空格下划线、其他字符、表格
 2. 表格不需要大模型生成中性词，直接用表头。其他情况再特殊处理
@@ -10,10 +7,6 @@
 
 
 # Word文档中性词解析填充工具
-
-![Version](https://img.shields.io/badge/版本-0.1.0-blue)
-![Python](https://img.shields.io/badge/Python-3.10+-green)
-![License](https://img.shields.io/badge/许可证-MIT-yellow)
 
 该工具用于智能解析Word文档中的待填写位置，利用大模型生成准确的"中性词"描述，并将其填回文档中，保持原有格式不变。
 
@@ -58,35 +51,6 @@ graph TD
     G --> I[生成处理报告]
 ```
 
-## 💻 安装与配置
-
-### 环境要求
-
-- Python 3.10+
-- 相关依赖包（详见requirements.txt）
-
-### 配置大模型API
-
-默认使用阿里云千问大模型(qwen-max)，需要在环境变量中配置：
-
-```bash
-# 复制示例配置文件
-cp .env.example .env
-
-# 编辑配置文件，填入API密钥
-vim .env
-
-# 加载环境变量
-source .env
-```
-
-主要配置项：
-
-```
-DASHSCOPE_API_KEY=你的API密钥
-DASHSCOPE_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL_NAME=qwen-max
-```
 
 ## 🚀 使用方法
 
@@ -158,30 +122,3 @@ python -m src.app.processor process-document your_file.docx --output-path result
 患者姓名: {{姓名}}，年龄: {{年龄}}，性别: {{性别}}。
 入院日期: {{入院日期}}，出院日期: {{出院日期}}。
 ```
-
-## 📚 常见问题
-
-1. **如何更换其他大模型?**
-   - 修改环境变量中的`LLM_MODEL_NAME`和相应的API配置
-
-2. **如何自定义中性词格式?**
-   - 修改`settings.py`中的`output_format`参数
-
-3. **如何提高占位符识别准确率?**
-   - 可以调整`character_detector.py`中的参数，或启用`llm_detector`
-
-## 🤝 贡献指南
-
-欢迎提交Pull Request或Issue来改进这个项目。提交前请确保:
-
-1. 代码通过基本测试
-2. 遵循项目的代码风格
-3. 提供简明的描述和必要的文档
-
-## 📄 许可证
-
-本项目采用MIT许可证 - 详情请参阅LICENSE文件
-
----
-
-*注: 本项目还在持续改进中，欢迎提供反馈和建议!*
