@@ -78,46 +78,57 @@ class DocumentFiller:
             return False
         idx_end = idx + len(target)
 
+        # 判断是否只在一个run内
+        run_start = run_end = None
+        for i, (start, end) in enumerate(run_ranges):
+            if idx >= start and idx < end:
+                run_start = i
+            if idx_end > start and idx_end <= end:
+                run_end = i
+        if run_start is not None and run_end is not None and run_start == run_end:
+            # 只在一个run内，交给单run替换
+            return False
+
+        # 否则，执行跨run替换
         replaced = False
         for i, (start, end) in enumerate(run_ranges):
             if end <= idx or start >= idx_end:
                 continue
             run = runs[i]
-            # 只涉及一个 run
-            if idx >= start and idx_end <= end:
+            # 头 run
+            if idx >= start and idx < end:
                 rel_start = idx - start
-                rel_end = idx_end - start
-                run.text = run.text[:rel_start] + replacement + run.text[rel_end:]
+                run.text = run.text[:rel_start] + replacement
                 if highlighted:
                     run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
-                replaced = True
-                break
-            # 占位符跨多个 run
-            else:
-                # 头 run
-                if idx >= start and idx < end:
-                    rel_start = idx - start
-                    run.text = run.text[:rel_start] + replacement
-                    if highlighted:
-                        run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
-                # 尾 run
-                elif idx_end > start and idx_end <= end:
-                    rel_end = idx_end - start
-                    run.text = run.text[rel_end:]
-                # 中间 run（完全被替换）
-                elif idx < start and idx_end > end:
-                    run.text = ''
-                replaced = True
+            # 尾 run
+            elif idx_end > start and idx_end <= end:
+                rel_end = idx_end - start
+                run.text = run.text[rel_end:]
+            # 中间 run（完全被替换）
+            elif idx < start and idx_end > end:
+                run.text = ''
+            replaced = True
         if replaced:
             logger.info(f"已将 '{target}' 跨 run 替换为 '{replacement}'")
         return replaced
 
     def _replace_in_single_run(self, runs, placeholder, replacement, highlighted):
-        """run 内替换，兼容下划线空格、llm_detected等类型"""
+        """run 内替换，兼容下划线空格、llm_detected等类型，优先用raw_text精准替换"""
         run_idx = placeholder.run_index if placeholder.run_index < len(runs) else 0
         run = runs[run_idx]
 
-        # 兼容不同类型的占位符
+        # 优先用raw_text进行替换
+        target = placeholder.raw_text if placeholder.raw_text else None
+        if target and target in run.text:
+            new_text = run.text.replace(target, replacement, 1)
+            run.text = new_text
+            if highlighted:
+                run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
+            logger.info(f"已将 '{target}' 替换为 '{replacement}' (run 内)")
+            return
+
+        # fallback: 兼容不同类型的占位符
         if placeholder.placeholder_type == "underline":
             import re
             underline_match = re.search(r"_{5,}", run.text)
@@ -138,7 +149,7 @@ class DocumentFiller:
         if highlighted:
             run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
 
-        logger.info(f"已将 '{original_text}' 替换为 '{replacement}' (run 内)")
+        logger.info(f"已将 '{original_text}' 替换为 '{replacement}' (run 内 fallback)")
     
     def _fill_table_placeholder(
         self, doc: Document, placeholder: PlaceholderInfo, neutral_term: str
