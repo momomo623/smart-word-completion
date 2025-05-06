@@ -65,6 +65,9 @@ class DocumentParser:
                     line_text=placeholder.line_text,
                     before_text=placeholder.before_text,
                     after_text=placeholder.after_text,
+                    raw_text=getattr(placeholder, 'raw_text', ''),
+                    start=getattr(placeholder, 'start', -1),
+                    end=getattr(placeholder, 'end', -1),
                 )
                 
                 # 获取中性词

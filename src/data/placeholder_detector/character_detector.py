@@ -110,10 +110,10 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
                     # 确定文本块索引
                     run_idx = self._find_run_index(para, match.start(), match.end())
                     
-                    # 提取上下文
-                    before_text, after_text = self.context_extractor.extract_context(
-                        full_text, placeholder_text
-                    )
+                    # 提取上下文（用段落内精确位置）
+                    context_window = self.context_extractor.window_size if hasattr(self.context_extractor, 'window_size') else 100
+                    before_text = para_text[max(0, match.start()-context_window):match.start()]
+                    after_text = para_text[match.end():match.end()+context_window]
                     
                     # 创建占位符显示文本
                     display_text = self._get_display_text(pattern_type, placeholder_text)
@@ -128,6 +128,8 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
                         after_text=after_text,
                         placeholder_type=pattern_type,
                         line_text=para_text,
+                        start=match.start(),
+                        end=match.end(),
                     )
                     
                     placeholders.append(placeholder)

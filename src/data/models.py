@@ -32,6 +32,8 @@ class PlaceholderInfo:
         placeholder_type: str = "auto",
         line_text: str = "",
         raw_text: str = "",
+        start: int = -1,
+        end: int = -1,
     ) -> None:
         """初始化占位符信息.
         
@@ -44,6 +46,8 @@ class PlaceholderInfo:
             placeholder_type: 占位符类型（underline, table, llm_detected, auto）
             line_text: 占位符所在行的完整文本
             raw_text: 原始占位符字符串
+            start: 占位符在段落中的起始位置
+            end: 占位符在段落中的结束位置
         """
         self.text = text
         self.paragraph_index = paragraph_index
@@ -54,6 +58,8 @@ class PlaceholderInfo:
         self.neutral_term: Optional[str] = None
         self.line_text = line_text
         self.raw_text = raw_text
+        self.start = start
+        self.end = end
     
     def __repr__(self) -> str:
         """返回占位符信息的字符串表示.

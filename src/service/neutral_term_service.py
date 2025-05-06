@@ -14,6 +14,10 @@ class NeutralTermRequest(BaseModel):
     before_text: str = Field(..., description="待填入位置的前文")
     after_text: str = Field(..., description="待填入位置的后文")
     context: str = Field(default="", description="上下文信息")
+    raw_text: str = Field(default="", description="待填入位置的原始文本")
+    start: int = Field(default=-1, description="占位符在段落中的起始位置")
+    end: int = Field(default=-1, description="占位符在段落中的结束位置")
+    
 
 
 class NeutralTermService:
@@ -43,16 +47,21 @@ class NeutralTermService:
         Returns:
             生成的中性词
         """
-        # 构建内容文本
-        # content_txt = request.before_text + "<neutral_term>" + request.after_text
+        # 用<neutral_term>精准替换line_text中的占位符
+        masked_line_text = request.line_text
+        if request.start != -1 and request.end != -1 and request.start < request.end:
+            masked_line_text = (
+                masked_line_text[:request.start] + "<neutral_term>" + masked_line_text[request.end:]
+            )
+        elif hasattr(request, 'raw_text') and request.raw_text:
+            masked_line_text = masked_line_text.replace(request.raw_text, "<neutral_term>", 1)
         
         # 格式化提示词
         try:
             prompt = self.prompt_template.format(
-                line_text=request.line_text,
+                line_text=masked_line_text,
                 before_text=request.before_text,
                 after_text=request.after_text,
-                # content=content_txt,
             )
         except KeyError as ke:
             logger.error(f"提示词模板格式化错误: 缺少参数 {ke}，请检查prompt_template配置")
@@ -71,32 +80,10 @@ class NeutralTermService:
         # 解析中性词
         try:
             # 使用LLMClient解析YAML
-            yaml_data = self.llm_client.parse_yaml(response)
-            
-            # 业务逻辑判断：检查是否包含neutral_term字段
-            if not yaml_data or "neutral_term" not in yaml_data:
-                logger.warning("解析结果中缺少neutral_term字段")
-                neutral_term = "???"
-            else:
-                neutral_term = yaml_data["neutral_term"]
-                
+            neutral_term = self.llm_client.extract_content_after_hash(response)
             logger.info(f"获取到中性词: {neutral_term}")
             return neutral_term
         except Exception as e:
             logger.error(f"解析中性词失败: {e}")
             return "???"
     
-    def get_neutral_term_batch(self, requests: List[NeutralTermRequest]) -> List[str]:
-        """批量获取中性词.
-        
-        Args:
-            requests: 中性词请求模型列表
-            
-        Returns:
-            中性词列表
-        """
-        results = []
-        for req in requests:
-            neutral_term = self.get_neutral_term(req)
-            results.append(neutral_term)
-        return results 

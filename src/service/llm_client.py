@@ -67,7 +67,7 @@ class LLMClient:
             Exception: 请求失败
         """
         try:
-            logger.debug(f"发送聊天请求到LLM: {user_message[:100]}...")
+            logger.debug(f"发送聊天请求到LLM: {user_message}...")
             
             # 发送请求到LLM服务
             response = self.client.chat.completions.create(
@@ -87,7 +87,7 @@ class LLMClient:
                 return ""
                 
             result = response.choices[0].message.content.strip()
-            logger.debug(f"大模型返回: {result[:200]}...")
+            logger.info(f"大模型返回: {result[:200]}...")
             
             return result
         except Exception as e:
@@ -121,7 +121,7 @@ class LLMClient:
             Exception: 请求失败或结果解析失败
         """
         try:
-            logger.debug(f"发送结构化数据请求到LLM: {user_message[:100]}...")
+            logger.debug(f"发送结构化数据请求到LLM: {user_message}...")
             
             # 使用JSON模式指导模型返回结构化数据
             response = self.client.chat.completions.create(
@@ -142,13 +142,33 @@ class LLMClient:
                 return {}
                 
             content = response.choices[0].message.content.strip()
-            logger.debug(f"大模型返回: {content[:200]}...")
+            logger.info(f"大模型返回: {content[:200]}...")
             
             return self._parse_json_response(content)
         except Exception as e:
             logger.error(f"结构化数据请求失败: {e}")
             raise
     
+    # 提取####后的内容
+    def extract_content_after_hash(self, content: str) -> str:
+        """提取####后的内容.
+        
+        Args:
+            content: 大模型返回的文本内容
+        
+        Returns:
+            提取后的内容
+        """
+        try:
+            # 查找####后的内容
+            start = content.find("####")
+            if start == -1:
+                return ""
+            # 提取####后的内容
+            return content[start + 4:].strip()
+        except Exception as e:
+            logger.error(f"提取内容失败: {e}")
+            return ""
     def _parse_json_response(self, content: str) -> Any:
         """解析JSON响应.
         
@@ -197,6 +217,16 @@ class LLMClient:
                 logger.error(f"提取JSON失败: {e}")
                 raise ValueError(f"无法解析响应为JSON: {e}") from e 
     
+    
+    # yaml_data = self.llm_client.parse_yaml(response)
+    # # 业务逻辑判断：检查是否包含neutral_term字段
+    # if not yaml_data or "neutral_term" not in yaml_data:
+    #     logger.warning("解析结果中缺少neutral_term字段")
+    #     neutral_term = "???"
+    # else:
+    #     neutral_term = yaml_data["neutral_term"]
+        
+    # logger.info(f"获取到中性词: {neutral_term}")
     def parse_yaml(self, response_text: str) -> Dict[str, Any]:
         """从LLM响应中解析YAML格式数据.
         
