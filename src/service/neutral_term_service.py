@@ -17,6 +17,7 @@ class NeutralTermRequest(BaseModel):
     raw_text: str = Field(default="", description="待填入位置的原始文本")
     start: int = Field(default=-1, description="占位符在段落中的起始位置")
     end: int = Field(default=-1, description="占位符在段落中的结束位置")
+    placeholder_type: str = Field(default="", description="占位符类型")
     
 
 
@@ -49,7 +50,10 @@ class NeutralTermService:
         """
         # 用<neutral_term>精准替换line_text中的占位符
         masked_line_text = request.line_text
-        if request.start != -1 and request.end != -1 and request.start < request.end:
+        if hasattr(request, 'placeholder_type') and request.placeholder_type == 'colon_field' and request.end != -1:
+            # 在冒号后插入<neutral_term>
+            masked_line_text = masked_line_text[:request.end] + '<neutral_term>' + masked_line_text[request.end:]
+        elif request.start != -1 and request.end != -1 and request.start < request.end:
             masked_line_text = (
                 masked_line_text[:request.start] + "<neutral_term>" + masked_line_text[request.end:]
             )

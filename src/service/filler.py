@@ -32,6 +32,17 @@ class DocumentFillerService:
             placeholders: 占位符列表
             output_path: 输出文件路径
         """
+        # 下面的在之前已经处理了，可以暂时放这里，未来需要处理其他类型占位符时，可以参考
+        # 针对colon_field类型，演示如何在冒号后插入内容
+        # for ph in placeholders:
+        #     if hasattr(ph, 'placeholder_type') and ph.placeholder_type == 'colon_field':
+        #         para = doc.paragraphs[ph.paragraph_index]
+        #         # 在冒号后插入内容（此处以<neutral_term>为例，实际可替换为目标内容）
+        #         new_text = para.text[:ph.end] + '<neutral_term>' + para.text[ph.end:]
+        #         # 直接修改段落文本（注意：docx的text属性只读，需重建runs或用更细致的API，简化演示如下）
+        #         for run in para.runs:
+        #             run.text = ''
+        #         para.add_run(new_text)
         # 保存文档
         self.doc_io.save_document(doc, output_path)
         

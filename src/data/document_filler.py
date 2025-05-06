@@ -51,13 +51,43 @@ class DocumentFiller:
         else:
             replacement = ('{{' + neutral_term + '}}')
             highlighted = False
+        
+        # “字段名+冒号+空格” 这种情况直接在冒号后插入replacement
+        if placeholder.placeholder_type == "colon_field":
+            # replacement作为一个run插入到runs[run_idx]后
+            run_idx = placeholder.run_index if placeholder.run_index < len(runs) else len(runs) - 1
+            # 在冒号后插入replacement
+            # 1. 找到冒号所在run及其在run内的位置
+            colon_pos = None
+            for i, run in enumerate(runs):
+                idx = run.text.rfind('：')
+                if idx != -1:
+                    colon_pos = (i, idx)
+                    break
+            if colon_pos:
+                i, idx = colon_pos
+                # 如果冒号后还有内容，需拆分run
+                run = runs[i]
+                before = run.text[:idx+1]
+                after = run.text[idx+1:]
+                run.text = before
+                # 插入replacement run
+                new_run = para.add_run(replacement)
+                # 如果冒号后原本有内容，插入新run
+                if after:
+                    para.add_run(after)
+            else:
+                # 没找到冒号，直接在当前run后插入
+                para.add_run(replacement)
+            
+            return
 
         # 优先跨 run 替换
         if self._try_replace_cross_run(runs, placeholder, replacement, highlighted):
             return
 
         # 否则，run 内替换
-        self._replace_in_single_run(runs, placeholder, replacement, highlighted)
+        self._replace_in_single_run(para, runs, placeholder, replacement, highlighted)
 
     def _try_replace_cross_run(self, runs, placeholder, replacement, highlighted) -> bool:
         """尝试跨 run 替换占位符，成功返回 True，否则 False"""
@@ -113,13 +143,16 @@ class DocumentFiller:
             logger.info(f"已将 '{target}' 跨 run 替换为 '{replacement}'")
         return replaced
 
-    def _replace_in_single_run(self, runs, placeholder, replacement, highlighted):
+    def _replace_in_single_run(self, para, runs, placeholder, replacement, highlighted):
         """run 内替换，兼容下划线空格、llm_detected等类型，优先用raw_text精准替换"""
         run_idx = placeholder.run_index if placeholder.run_index < len(runs) else 0
         run = runs[run_idx]
 
         # 优先用raw_text进行替换
         target = placeholder.raw_text if placeholder.raw_text else None
+        
+       
+            
         if target and target in run.text:
             new_text = run.text.replace(target, replacement, 1)
             run.text = new_text

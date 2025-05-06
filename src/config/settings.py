@@ -23,26 +23,16 @@ class LLMConfig(BaseModel):
 
     
     """
-    当前行:{line_text}
+当前行:{line_text}
 占位符前序内容:{before_text}  
 占位符后序内容:{after_text}  
     """
     # 提示词相关配置
     prompt_template: str = Field(default_factory=lambda: os.environ.get("PROMPT_TEMPLATE", """
 你是一个专业的内容分析助手，擅长根据上下文生成精准的描述词。
-**当前行**  
-<current_line>
-{line_text}  
-</current_line>
-**前序内容**  
-<before_text>
-{before_text}  
-</before_text>
-**后序内容**  
-<after_text>
-{after_text}  
-</after_text>
-
+当前行：{line_text}  
+前序内容：{before_text}  
+后序内容：{after_text}  
 
 **任务要求**  
 1. 生成中性描述词，作为<neutral_term>的内容。

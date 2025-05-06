@@ -51,6 +51,13 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
             # "brace_text": r"\{([^}]+)\}",  # 如 {填写}、{请输入}
             "xxx_placeholder": r"x{2,10}",  # 识别连续出现的x，如 xxx、xxxxxx
             # "bracket_xxx": r"[（(]\s*x{2,10}[^）)]*[）)]",  # 识别括号中的xxx，如 (xxx) 或 （xxx公司）
+            "colon_field": r"[\u4e00-\u9fa5A-Za-z0-9]{2,8}：\s*$",  # 新增：字段名+冒号+无内容
+            # 新增：字段名+冒号+空格
+            "colon_field_space": r"[\u4e00-\u9fa5A-Za-z0-9]{2,8}：\s+.+",  # 字段名+冒号+空格+内容，且不是行尾
+# todo 
+# 1. colon_field和colon_field_space的重复识别
+# 2. colon_field_space插入位置不对
+
         }
         
         # 合并自定义模式与默认模式
@@ -104,32 +111,53 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
                         if len(content) < 2 or content in ["的", "和", "与", "或"]:
                             continue
                     
+                    display_text = self._get_display_text(pattern_type, placeholder_text)
                     # 记录已处理的位置
                     processed_positions.add(position_key)
                     
                     # 确定文本块索引
-                    run_idx = self._find_run_index(para, match.start(), match.end())
+                    start_pos = match.start()
+                    end_pos = match.end()
+                    
+                    # 正则检测“字段名+冒号+无内容”时，正则的起始点不是要插入的位置（占位符的位置），需要调整
+                    if pattern_type == "colon_field":
+                        start_pos = start_pos + len(placeholder_text)
+                        end_pos = end_pos + len("<neutral_term>")
+                        placeholder_text = "<neutral_term>"
+                        para_text = para_text + "<neutral_term>"
+                    
+                    # 正则检测“字段名+冒号+空格”时，正则的起始点不是要插入的位置（占位符的位置），需要调整
+                    # 查询冒号的位置
+                    if pattern_type == "colon_field_space":
+                        colon_pos = para_text.find(":")
+                        # 或者中文冒号
+                        if colon_pos == -1:
+                            colon_pos = para_text.find("：")
+                        if colon_pos:
+                            start_pos = colon_pos + 1
+                            end_pos = end_pos + len("<neutral_term>")
+                            placeholder_text = "<neutral_term>"
+                            para_text = para_text + "<neutral_term>"
+                    
+                    run_idx = self._find_run_index(para, start_pos, end_pos)
                     
                     # 提取上下文（用段落内精确位置）
                     context_window = self.context_extractor.window_size if hasattr(self.context_extractor, 'window_size') else 100
-                    before_text = para_text[max(0, match.start()-context_window):match.start()]
-                    after_text = para_text[match.end():match.end()+context_window]
-                    
-                    # 创建占位符显示文本
-                    display_text = self._get_display_text(pattern_type, placeholder_text)
+                    before_text = para_text[max(0, start_pos-context_window):start_pos]
+                    after_text = para_text[end_pos:end_pos+context_window]
                     
                     # 创建占位符信息对象
                     placeholder = PlaceholderInfo(
-                        text=display_text,
-                        raw_text=placeholder_text,
-                        paragraph_index=para_idx,
-                        run_index=run_idx,
-                        before_text=before_text,
-                        after_text=after_text,
-                        placeholder_type=pattern_type,
-                        line_text=para_text,
-                        start=match.start(),
-                        end=match.end(),
+                        text=display_text,  # 用于显示的占位符文本（如"字段名：<neutral_term>"或"下划线占位符"）
+                        raw_text=placeholder_text,  # 原始占位符文本（正则匹配到的原文）
+                        paragraph_index=para_idx,  # 占位符所在段落的索引
+                        run_index=run_idx,  # 占位符所在文本块（run）的索引
+                        before_text=before_text,  # 占位符前的上下文文本
+                        after_text=after_text,  # 占位符后的上下文文本
+                        placeholder_type=pattern_type,  # 占位符类型（如colon_field、underline等）
+                        line_text=para_text,  # 占位符所在的整行文本
+                        start=start_pos,  # 占位符在段落中的起始位置
+                        end=end_pos,  # 占位符在段落中的结束位置
                     )
                     
                     placeholders.append(placeholder)
@@ -174,6 +202,10 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
             return "空方括号占位符"
         elif pattern_type == "brace_empty":
             return "空花括号占位符"
+        elif pattern_type == "colon_field":
+            return "冒号字段（无内容）"
+        elif pattern_type == "colon_field_space":
+            return "冒号字段（有内容）"
         else:
             return f"{pattern_type}占位符"
     
