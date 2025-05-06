@@ -62,8 +62,9 @@ class DocumentHandler:
             for placeholder in detector_placeholders:
                 if placeholder.placeholder_type == "table":
                     continue
-                logger.debug(f"\n当前行: {placeholder.line_text} \n 段落索引: {placeholder.paragraph_index} 文本块索引: {placeholder.run_index} 占位符: {placeholder.text} \n 上下文: {placeholder.before_text} {placeholder.after_text}")
-        
+                logger.debug(f"\n \n 段落索引: {placeholder.paragraph_index} 文本块索引: {placeholder.run_index} 占位符: {placeholder.text} \n 当前行: {placeholder.line_text}")
+                # 上下文: {placeholder.before_text} {placeholder.after_text}
+                logger.debug('-' * 50)
         logger.info(f"总共找到 {len(placeholders)} 个占位符")
         return placeholders
     

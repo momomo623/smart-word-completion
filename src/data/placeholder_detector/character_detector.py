@@ -41,14 +41,16 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
         # 默认占位符模式
         default_patterns = {
             "underline": rf"_{{{min_repetition},}}",  # 如 ___、_____
-            "asterisk": rf"\*{{{min_repetition},}}",  # 如 ***、*****
-            "dash": rf"-{{{min_repetition},}}",  # 如 ---、-----
-            "equal": rf"={{{min_repetition},}}",  # 如 ===、=====
-            "hash": rf"#{{{min_repetition},}}",  # 如 ###、#####
-            "bracket_empty": r"\[\s*_*\s*\]",  # 如 []、[___]、[ ]
-            "bracket_text": r"\[([^]]+)\]",  # 如 [填写]、[请输入]
-            "brace_empty": r"\{\s*_*\s*\}",  # 如 {}、{___}、{ }
-            "brace_text": r"\{([^}]+)\}",  # 如 {填写}、{请输入}
+            # "asterisk": rf"\*{{{min_repetition},}}",  # 如 ***、*****
+            # "dash": rf"-{{{min_repetition},}}",  # 如 ---、-----
+            # "equal": rf"={{{min_repetition},}}",  # 如 ===、=====
+            # "hash": rf"#{{{min_repetition},}}",  # 如 ###、#####
+            # "bracket_empty": r"\[\s*_*\s*\]",  # 如 []、[___]、[ ]
+            # "bracket_text": r"\[([^]]+)\]",  # 如 [填写]、[请输入]
+            # "brace_empty": r"\{\s*_*\s*\}",  # 如 {}、{___}、{ }
+            # "brace_text": r"\{([^}]+)\}",  # 如 {填写}、{请输入}
+            "xxx_placeholder": r"x{2,10}",  # 识别连续出现的x，如 xxx、xxxxxx
+            # "bracket_xxx": r"[（(]\s*x{2,10}[^）)]*[）)]",  # 识别括号中的xxx，如 (xxx) 或 （xxx公司）
         }
         
         # 合并自定义模式与默认模式
@@ -119,6 +121,7 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
                     # 创建占位符信息对象
                     placeholder = PlaceholderInfo(
                         text=display_text,
+                        raw_text=placeholder_text,
                         paragraph_index=para_idx,
                         run_index=run_idx,
                         before_text=before_text,
@@ -153,6 +156,10 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
             return f"花括号占位符: {content}" if content else "空花括号占位符"
         elif pattern_type == "underline":
             return "下划线占位符"
+        elif pattern_type == "xxx_placeholder":
+            return "xxx占位符"
+        elif pattern_type == "bracket_xxx":
+            return "括号xxx占位符"
         elif pattern_type == "asterisk":
             return "星号占位符"
         elif pattern_type == "dash":

@@ -40,31 +40,85 @@ class DocumentFiller:
     def _fill_text_placeholder(
         self, doc: Document, placeholder: PlaceholderInfo, neutral_term: str
     ) -> None:
-        """填充文本类型占位符（段落中）.
-        
-        Args:
-            doc: Document对象
-            placeholder: 占位符信息
-            neutral_term: 中性词
-        """
-        # 获取段落
+        """填充文本类型占位符（段落中），支持跨 run 替换，兼容多种检测器."""
         para = doc.paragraphs[placeholder.paragraph_index]
-        
-        # 确保文本块索引有效
-        if placeholder.run_index >= len(para.runs):
-            logger.warning(
-                f"文本块索引超出范围: {placeholder.run_index} >= {len(para.runs)}, "
-                f"将使用第一个文本块"
-            )
-            run_idx = 0
+        runs = para.runs
+
+        # 构造替换内容
+        if neutral_term == "???":
+            replacement = ('{{' + neutral_term + '}}')
+            highlighted = True
         else:
-            run_idx = placeholder.run_index
-        
-        run = para.runs[run_idx]
-        
-        # 根据占位符类型确定要替换的文本
+            replacement = ('{{' + neutral_term + '}}')
+            highlighted = False
+
+        # 优先跨 run 替换
+        if self._try_replace_cross_run(runs, placeholder, replacement, highlighted):
+            return
+
+        # 否则，run 内替换
+        self._replace_in_single_run(runs, placeholder, replacement, highlighted)
+
+    def _try_replace_cross_run(self, runs, placeholder, replacement, highlighted) -> bool:
+        """尝试跨 run 替换占位符，成功返回 True，否则 False"""
+        # 拼接所有 run 的文本，记录每个 run 的起止位置
+        run_ranges = []
+        full_text = ''
+        for run in runs:
+            start = len(full_text)
+            full_text += run.text
+            end = len(full_text)
+            run_ranges.append((start, end))
+
+        target = placeholder.raw_text if placeholder.raw_text else None
+        if not target:
+            return False
+        idx = full_text.find(target)
+        if idx == -1:
+            return False
+        idx_end = idx + len(target)
+
+        replaced = False
+        for i, (start, end) in enumerate(run_ranges):
+            if end <= idx or start >= idx_end:
+                continue
+            run = runs[i]
+            # 只涉及一个 run
+            if idx >= start and idx_end <= end:
+                rel_start = idx - start
+                rel_end = idx_end - start
+                run.text = run.text[:rel_start] + replacement + run.text[rel_end:]
+                if highlighted:
+                    run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
+                replaced = True
+                break
+            # 占位符跨多个 run
+            else:
+                # 头 run
+                if idx >= start and idx < end:
+                    rel_start = idx - start
+                    run.text = run.text[:rel_start] + replacement
+                    if highlighted:
+                        run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
+                # 尾 run
+                elif idx_end > start and idx_end <= end:
+                    rel_end = idx_end - start
+                    run.text = run.text[rel_end:]
+                # 中间 run（完全被替换）
+                elif idx < start and idx_end > end:
+                    run.text = ''
+                replaced = True
+        if replaced:
+            logger.info(f"已将 '{target}' 跨 run 替换为 '{replacement}'")
+        return replaced
+
+    def _replace_in_single_run(self, runs, placeholder, replacement, highlighted):
+        """run 内替换，兼容下划线空格、llm_detected等类型"""
+        run_idx = placeholder.run_index if placeholder.run_index < len(runs) else 0
+        run = runs[run_idx]
+
+        # 兼容不同类型的占位符
         if placeholder.placeholder_type == "underline":
-            # 查找下划线
             import re
             underline_match = re.search(r"_{5,}", run.text)
             if underline_match:
@@ -72,37 +126,19 @@ class DocumentFiller:
             else:
                 original_text = run.text
         elif placeholder.placeholder_type == "underline_space":
-            # 对于下划线空格，我们直接替换整个文本块
-            # 因为空格较难定位，替换整个文本块更安全
             original_text = run.text
         elif placeholder.placeholder_type == "llm_detected":
-            # 对于LLM检测的占位符，直接使用前后文定位
             original_text = run.text
         else:
             original_text = run.text
-        
-        # 准备替换文本
-        if neutral_term == "???":
-            # 未知中性词，使用黄色高亮
-            replacement = ('{{' + neutral_term + '}}')
-            highlighted = True
-        else:
-            # 正常中性词
-            replacement = ('{{' + neutral_term + '}}')
-            highlighted = False
-        
-        # 替换文本
+
         new_text = run.text.replace(original_text, replacement)
-        
-        # 应用替换
         run.text = new_text
-        
-        # 如果需要高亮
+
         if highlighted:
-            # 设置黄色高亮背景
             run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.YELLOW
-        
-        logger.info(f"已将 '{original_text}' 替换为 '{replacement}'")
+
+        logger.info(f"已将 '{original_text}' 替换为 '{replacement}' (run 内)")
     
     def _fill_table_placeholder(
         self, doc: Document, placeholder: PlaceholderInfo, neutral_term: str

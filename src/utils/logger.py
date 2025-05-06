@@ -37,6 +37,5 @@ def setup_logger() -> None:
     
     logger.info(f"日志系统已初始化，级别：{settings.log.level}")
 
-
-# 初始化日志配置
-setup_logger() 
+# 注意：不在模块级别调用setup_logger()，避免重复初始化
+# 初始化将在 src/__init__.py 中进行 

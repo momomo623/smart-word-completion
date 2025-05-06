@@ -22,3 +22,6 @@ output.docx
 output.md
 
 .env.example
+
+input/
+output/
