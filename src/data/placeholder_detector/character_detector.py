@@ -83,6 +83,9 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
         
         # 使用集合记录已处理的占位符位置，避免重复
         processed_positions = set()
+        # 记录已匹配的区间，避免所有类型的重复识别
+        # 结构：[(paragraph_index, run_index, run_start, run_end)]
+        matched_ranges = []
         
         # 遍历所有段落和文本块
         for para_idx, para in enumerate(doc.paragraphs):
@@ -92,9 +95,37 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
             if not para_text.strip():
                 continue
             
-            # 在段落中查找各种占位符模式
+            # 依次遍历所有pattern_type，优先顺序可调整
             for pattern_type, pattern in self.patterns.items():
+                
                 for match in pattern.finditer(para_text):
+                    # 避免重复检测 --------------------------------------------
+                    # 计算run_index和run内start/end
+                    start_pos = match.start()
+                    end_pos = match.end()
+                    run_idx = self._find_run_index(para, start_pos, end_pos)
+                    # 计算run内的start/end
+                    run_start_in_para = 0
+                    for i, run in enumerate(para.runs):
+                        run_len = len(run.text)
+                        if i < run_idx:
+                            run_start_in_para += run_len
+                    run_inner_start = start_pos - run_start_in_para if run_idx < len(para.runs) else 0
+                    run_inner_end = end_pos - run_start_in_para if run_idx < len(para.runs) else 0
+                    # 检查是否与已匹配区间重叠
+                    overlap = False
+                    for (pidx, ridx, rstart, rend) in matched_ranges:
+                        if pidx == para_idx and ridx == run_idx:
+                            # run内区间有重叠
+                            if not (run_inner_end <= rstart or run_inner_start >= rend):
+                                overlap = True
+                                break
+                    if overlap:
+                        logger.info(f"跳过与已匹配区间重叠的占位符: {match.group(0)} (段落{para_idx}, run{run_idx}, 区间{run_inner_start}-{run_inner_end})")
+                        continue
+                    # 避免重复检测 --------------------------------------------
+                    
+                    
                     placeholder_text = match.group(0)  # 匹配的占位符文本
                     
                     # 创建唯一标识，避免重复检测同一位置
@@ -114,19 +145,21 @@ class CharacterPlaceholderDetector(PlaceholderDetector):
                     display_text = self._get_display_text(pattern_type, placeholder_text)
                     # 记录已处理的位置
                     processed_positions.add(position_key)
+                    # 新增：记录本次匹配区间，避免后续pattern重复
+                    matched_ranges.append((para_idx, run_idx, run_inner_start, run_inner_end))
                     
                     # 确定文本块索引
                     start_pos = match.start()
                     end_pos = match.end()
                     
-                    # 正则检测“字段名+冒号+无内容”时，正则的起始点不是要插入的位置（占位符的位置），需要调整
+                    # 正则检测"字段名+冒号+无内容"时，正则的起始点不是要插入的位置（占位符的位置），需要调整
                     if pattern_type == "colon_field":
                         start_pos = start_pos + len(placeholder_text)
                         end_pos = end_pos + len("<neutral_term>")
                         placeholder_text = "<neutral_term>"
                         para_text = para_text + "<neutral_term>"
                     
-                    # 正则检测“字段名+冒号+空格”时，正则的起始点不是要插入的位置（占位符的位置），需要调整
+                    # 正则检测"字段名+冒号+空格"时，正则的起始点不是要插入的位置（占位符的位置），需要调整
                     # 查询冒号的位置
                     if pattern_type == "colon_field_space":
                         colon_pos = para_text.find(":")

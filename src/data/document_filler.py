@@ -52,36 +52,9 @@ class DocumentFiller:
             replacement = ('{{' + neutral_term + '}}')
             highlighted = False
         
-        # “字段名+冒号+空格” 这种情况直接在冒号后插入replacement
-        if placeholder.placeholder_type == "colon_field":
-            # replacement作为一个run插入到runs[run_idx]后
-            run_idx = placeholder.run_index if placeholder.run_index < len(runs) else len(runs) - 1
-            # 在冒号后插入replacement
-            # 1. 找到冒号所在run及其在run内的位置
-            colon_pos = None
-            for i, run in enumerate(runs):
-                idx = run.text.rfind('：')
-                if idx != -1:
-                    colon_pos = (i, idx)
-                    break
-            if colon_pos:
-                i, idx = colon_pos
-                # 如果冒号后还有内容，需拆分run
-                run = runs[i]
-                before = run.text[:idx+1]
-                after = run.text[idx+1:]
-                run.text = before
-                # 插入replacement run
-                new_run = para.add_run(replacement)
-                # 如果冒号后原本有内容，插入新run
-                if after:
-                    para.add_run(after)
-            else:
-                # 没找到冒号，直接在当前run后插入
-                para.add_run(replacement)
-            
+        # 优先处理colon_field和colon_field_space类型
+        if self._fill_colon_field_like(para, runs, placeholder, replacement):
             return
-
         # 优先跨 run 替换
         if self._try_replace_cross_run(runs, placeholder, replacement, highlighted):
             return
@@ -230,3 +203,54 @@ class DocumentFiller:
         placeholder.neutral_term = header_text + str(row_idx)
         
         logger.debug(f"已在表格[{table_idx}]的单元格[{row_idx}, {cell_idx}]填入表头占位符: '{replacement}'")
+
+    def _fill_colon_field_like(self, para, runs, placeholder, replacement):
+        """
+        处理colon_field和colon_field_space类型的回填，返回True表示已处理。
+        - colon_field: 在冒号后插入replacement，可能新建run。
+        - colon_field_space: 在冒号后第一个非空字符前插入replacement，不新建run。
+        Args:
+            para: 当前段落对象
+            runs: 当前段落的runs列表
+            placeholder: 占位符信息对象
+            replacement: 要插入的内容（如{{xxx}}）
+        Returns:
+            bool: True表示已处理，False表示未处理
+        """
+        if placeholder.placeholder_type not in ("colon_field", "colon_field_space"):
+            return False
+        run_idx = placeholder.run_index if placeholder.run_index < len(runs) else len(runs) - 1
+        # 找到冒号所在run及其在run内的位置
+        colon_pos = None
+        for i, run in enumerate(runs):
+            idx = run.text.rfind('：')
+            if idx != -1:
+                colon_pos = (i, idx)
+                break
+        if colon_pos:
+            i, idx = colon_pos
+            run = runs[i]
+            if placeholder.placeholder_type == "colon_field":
+                # colon_field: 在冒号后插入replacement，可能新建run
+                before = run.text[:idx+1]
+                after = run.text[idx+1:]
+                run.text = before
+                new_run = para.add_run(replacement)
+                if after:
+                    para.add_run(after)
+                return True
+            elif placeholder.placeholder_type == "colon_field_space":
+                # colon_field_space: 在冒号后第一个非空字符前插入replacement，不新建run
+                after_colon = run.text[idx+1:]
+                offset = 0
+                for offset, ch in enumerate(after_colon):
+                    if not ch.isspace():
+                        break
+                insert_pos = idx + 1 + offset
+                run.text = run.text[:insert_pos] + replacement + run.text[insert_pos:]
+                return True
+        else:
+            # 没找到冒号，直接在当前run后插入
+            para.add_run(replacement)
+            return True
+        return False
