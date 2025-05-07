@@ -21,38 +21,6 @@ class LLMConfig(BaseModel):
     temperature: float = Field(default_factory=lambda: float(os.environ.get("TEMPERATURE", "0.7")))  # 生成多样性（温度）
     timeout: int = Field(default_factory=lambda: int(os.environ.get("TIMEOUT", "30")))  # API请求超时时间（秒）
 
-    
-    """
-当前行:{line_text}
-占位符前序内容:{before_text}  
-占位符后序内容:{after_text}  
-    """
-    # 提示词相关配置
-    prompt_template: str = Field(default_factory=lambda: os.environ.get("PROMPT_TEMPLATE", """
-你是一个专业的内容分析助手，擅长根据上下文生成精准的描述词。
-当前行：{line_text}  
-前序内容：{before_text}  
-后序内容：{after_text}  
-
-**任务要求**  
-1. 生成中性描述词，作为<neutral_term>的内容。
-2. 前序字段继承原则：优先继承前文的字段名称（如"姓名:____"直接继承"姓名"）。
-3. 后序字段继承原则：如果前序字段不明确，可结合后文字段（如"xxxx专业申请"应输出"专业名称"）。
-4. 中性描述词总结：如果没有前序和后续字段名称，根据上下文提取最贴切的名词短语。
-5. 安全边界：如上下文字段不明确，请返回"???"。
-6. 在分析过程中，请逐步思考，但每个步骤的描述尽量简洁（不超过10个字）。
-7. 使用分隔符"####"来区分思考过程与最终答案，"####"后直接输出中性词。
-
-思考1:（不超过10个字）
-思考2:（不超过10个字）
-####
-<neutral_term>
-
-"""))  # 大模型提示词模板
-
-# ```yaml
-# neutral_term: "提取的中性词，如果不确定则为???"
-# ```
 
     placeholder_detect_prompt: str = Field(default_factory=lambda: os.environ.get("PLACEHOLDER_DETECT_PROMPT", """
 你是一名专业的内容分析助手。你的任务是审查下方Word文档的段落结构，判断每个run是否包含占位符或需要人工填写的内容（如姓名、日期、专业等字段）。
@@ -122,27 +90,13 @@ fill_list: {{}}
 {paragraph_text}
 每个run：
 {paragraph_runs}
-"""))  # 检测占位符的提示词
-
-class DocumentConfig(BaseModel):
-    """文档处理配置."""
-    
-    placeholder_pattern: str = Field(default_factory=lambda: os.environ.get("PLACEHOLDER_PATTERN", r"{{(.*?)}}"))  # 占位符正则表达式
-    context_window: int = Field(default_factory=lambda: int(os.environ.get("CONTEXT_WINDOW", "100")))  # 上下文窗口大小（字符数）
-    highlight_color: str = Field(default_factory=lambda: os.environ.get("HIGHLIGHT_COLOR", "FFFF00"))  # 高亮颜色（默认黄色）
-    output_format: str = Field(default_factory=lambda: os.environ.get("OUTPUT_FORMAT", "{{{{{}}}}}"))  # 中性词输出格式
-    unknown_format: str = Field(default_factory=lambda: os.environ.get("UNKNOWN_FORMAT", "{{{{{}}}}}"))  # 未知中性词输出格式
-
+"""))  
 
 class LogConfig(BaseModel):
     """日志配置."""
     
     level: str = Field(default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO"))  # 日志级别
-    # format: str = Field(
-    #     os.environ.get("LOG_FORMAT", 
-    #     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"),
-    #     description="日志格式",
-    # )
+  
     # 精简日志格式
     format: str = Field(default_factory=lambda: os.environ.get("LOG_FORMAT", "<level>{level: <8}</level>| - <level>{message}</level>"))
     log_file: Optional[str] = Field(default_factory=lambda: os.environ.get("LOG_FILE", "word_processor.log"))  # 日志文件名
@@ -154,7 +108,6 @@ class Settings(BaseModel):
     """项目全局设置."""
     
     llm: LLMConfig = Field(default_factory=LLMConfig)  # 大模型相关配置
-    document: DocumentConfig = Field(default_factory=DocumentConfig)  # 文档处理相关配置
     log: LogConfig = Field(default_factory=LogConfig)  # 日志相关配置
     
     # 项目路径配置

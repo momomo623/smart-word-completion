@@ -9,7 +9,7 @@ from loguru import logger
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
-from src.config.settings import settings
+from config.settings import settings
 
 
 class LLMClient:
@@ -67,7 +67,7 @@ class LLMClient:
             Exception: 请求失败
         """
         try:
-            logger.debug(f"发送聊天请求到LLM: {user_message}...")
+            logger.debug(f"发送聊天请求到LLM: {user_message}")
             
             # 发送请求到LLM服务
             response = self.client.chat.completions.create(
@@ -142,7 +142,7 @@ class LLMClient:
                 return {}
                 
             content = response.choices[0].message.content.strip()
-            logger.info(f"大模型返回: {content[:200]}...")
+            logger.info(f"大模型返回: {content}...")
             
             return self._parse_json_response(content)
         except Exception as e:
