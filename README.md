@@ -13,7 +13,9 @@
 - 缺点：检测和回填的准确率略低于手动实现，可能存在遗漏或错误，大部分没有问题。
 
 **用法（全自动）**
+
 python llm_detector/main.py input --output-dir ./output
+
 input: 输入文件路径，可多个
 
 两种模型的README合在了一起：
