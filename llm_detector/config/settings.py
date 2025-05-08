@@ -17,8 +17,8 @@ class LLMConfig(BaseModel):
     model_name: str = Field(default_factory=lambda: os.environ.get("LLM_MODEL_NAME", "qwen-max"))  # 使用的大模型名称
     api_key: Optional[str] = Field(default_factory=lambda: os.environ.get("DASHSCOPE_API_KEY"))  # 大模型API密钥
     api_base_url: Optional[str] = Field(default_factory=lambda: os.environ.get("DASHSCOPE_API_BASE", "https://dashscope.aliyuncs.com/compatible-mode/v1"))  # API基础URL
-    max_tokens: int = Field(default_factory=lambda: int(os.environ.get("MAX_TOKENS", "100")))  # 生成的最大token数
-    temperature: float = Field(default_factory=lambda: float(os.environ.get("TEMPERATURE", "0.7")))  # 生成多样性（温度）
+    max_tokens: int = Field(default_factory=lambda: int(os.environ.get("MAX_TOKENS", "2000")))  # 生成的最大token数
+    temperature: float = Field(default_factory=lambda: float(os.environ.get("TEMPERATURE", "0.1")))  # 生成多样性（温度）
     timeout: int = Field(default_factory=lambda: int(os.environ.get("TIMEOUT", "30")))  # API请求超时时间（秒）
 
 

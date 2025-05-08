@@ -5,7 +5,7 @@ from docx import Document
 from pocketflow import AsyncFlow, Node, AsyncParallelBatchNode
 from utils.llm_client import LLMClient
 from utils.document_io import read_docx, save_docx
-
+from loguru import logger
 # 注意：本流程包含异步节点，必须用await flow.run_async(shared)调用。
 
 class BatchReadDocNode(Node):
@@ -58,26 +58,22 @@ class DispatchNode(Node):
                                 "type": "table_cell"
                             })
                 else:
-                    # 多列表格，按行整体处理，去重cell_text，只保留第一次出现
+                    # 多列表格，按行整体处理，跨行同列去重（cell对象唯一）
+                    seen_tc_ids = set()
                     for row_idx, row in enumerate(table.rows):
                         row_cells = []
-                        seen = set()
                         for col_idx, cell in enumerate(row.cells):
+                            tc_id = id(cell._tc)
+                            if tc_id in seen_tc_ids:
+                                continue  # 跳过合并行导致的重复cell
+                            seen_tc_ids.add(tc_id)
                             cell_text = "\n".join([p.text for p in cell.paragraphs if p.text.strip()])
-                            # 跳过全空cell
-                            if cell_text.strip() == "":
-                                continue
-                            if cell_text in seen:
-                                continue  # 跳过重复cell_text
-                            seen.add(cell_text)
                             row_cells.append({
                                 "col_id": col_idx,
                                 "cell_text": cell_text,
-                                "cell": cell
+                                "cell": cell,
+                                "real_col_id": col_idx
                             })
-                        # 跳过全空行
-                        if not row_cells:
-                            continue
                         tasks_table_row.append({
                             "doc_idx": doc_idx,
                             "table_id": table_idx,
@@ -97,6 +93,15 @@ class DispatchNode(Node):
         #     actions.append("table_row")
         # 如果都有，优先para，PocketFlow会依次分支
         # return actions[0] if actions else None
+        
+        # 格式化输出para_tasks和table_row_tasks
+        # for task in exec_res["para_tasks"]:
+        #     logger.info(f"\n段落任务：\n{task}\n")
+        for task in exec_res["table_row_tasks"]:
+            print("-"*80)
+            print(f"行{task['row_id']}")
+            for col in  task["row_cells"]:
+                print(f"列{col['col_id']}   {col['cell_text']}")
         return "default"
 
 class ParaLLMFillNode(AsyncParallelBatchNode):
@@ -118,6 +123,7 @@ class ParaLLMFillNode(AsyncParallelBatchNode):
         para = item["para"]
         paragraph_text = para.text
         runs_text = "\n".join([f'  run{j}: "{run.text.strip()}"' for j, run in enumerate(para.runs)])
+        logger.info(f"\n段落：{paragraph_text}\n每个run：{runs_text}")
         prompt = f"""
 你是一名专业的内容分析助手。你的任务是审查下方Word文档的段落结构，判断每个run是否包含占位符或需要人工填写的内容（如姓名、日期、专业等字段）。
 
@@ -181,6 +187,7 @@ fill_list:
         logs = []
         if yaml_data.get("need_fill"):
             fill_list = yaml_data.get("fill_list") or {}
+            
             for run_idx, run_filled_text in fill_list.items():
                 try:
                     idx = int(run_idx)
@@ -220,46 +227,92 @@ class TableRowLLMFillNode(AsyncParallelBatchNode):
         super().__init__()
         self.llm_client = LLMClient()
     async def prep_async(self, shared):
-        return shared.get("table_row_tasks", [])
+        # 将docs对象一并传递到每个任务item中
+        docs = shared["docs"]
+        tasks = shared.get("table_row_tasks", [])
+        for task in tasks:
+            task["docs"] = docs
+        return tasks
     async def exec_async(self, item):
-        # 优化prompt，参考段落提示词，强调每列内容、上下文和依赖关系
         row_cells = item["row_cells"]
         virtual2real = {}
         row_texts = []
         for v_idx, cell in enumerate(row_cells):
-            virtual2real[str(v_idx)] = cell["col_id"]
-            row_texts.append(f"列{v_idx}: {cell['cell_text']}")
+            virtual2real[str(v_idx)] = cell["real_col_id"]
+            cell_obj = cell["cell"]
+            run_lines = []
+            for para_id, para in enumerate(cell_obj.paragraphs):
+                for run_id, run in enumerate(para.runs):
+                    if run.text.strip():
+                        run_lines.append(f"  - para_id={para_id}, run_id={run_id}, text=\"{run.text.strip()}\"")
+            if run_lines:
+                cell_block = f"列{v_idx}:\n" + "\n".join(run_lines)
+            else:
+                cell_block = f"列{v_idx}: <空>"
+                
+            row_texts.append(cell_block)
+        logger.info(f"\n结构化表格行输入：\n{chr(10).join(row_texts)}\n")
         prompt = f"""
-你是一名专业的内容分析助手。你的任务是分析下方Word表格的一行内容，判断每一列（格）是否包含占位符或需要人工填写的内容（如姓名、日期、专业等字段），并输出结构化结果。
+你是一名专业的内容分析助手。你将收到一个Word表格的一行内容，每一列都详细列出了所有run的信息（para_id, run_id, text）。
+你的任务是分析下方Word表格的一行内容，判断每一列的每个run是否包含占位符或需要人工填写的内容（如姓名、日期、专业等字段），并输出结构化结果。
 
 **任务要求**
-- 你需要结合本行所有列的内容，判断每一列是否需要填写中性词。
-- 某一列的填写可以依赖前一列的内容，也可以不依赖。
-- 如果某列不需要填写，need_fill设为false，neutral_term设为""。
-- 如果某列需要填写，need_fill设为true，neutral_term为中性词（如{{公司名称}}、{{日期}}等）。
-- 不要修改原始文本，只能替换占位符或者添加中性词。
-- 输出格式为YAML，每列一个字段，内容为：need_fill: true/false, neutral_term: "..."
+- 你需要结合本行所有列的内容，判断每个run是否需要填写内容。将需要填写的内容总结为一个中性词，和原始文本作为run_filled_text一起输出，(如"原始文本:{{中性词}}")。
+- 如果某个run不需要修改，则无需输出
+- 如果某格内容为空，有可能依赖于上一格，请根据上一格的文本判断是否需要填写
+- 如果2列依赖1列，则2列需要填写，1列不需要填写任何内容
+- 尤其关注冒号，如果有冒号大概率需要填写中性词
+- 如果某格内容为选项框，不要填写
+- 不要修改原始文本，只能替换占位符或者添加中性词
 - 在分析过程中，请逐步思考，但每个步骤的描述尽量简洁（不超过10个字）。
 - 使用分隔符"####"来区分思考过程与最终答案，"####"后直接输出YAML。
 
-**输入示例**
-{chr(10).join(row_texts)}
-
-**输出示例**
+**输出格式**
 思考1:（不超过10个字）
 思考2:（不超过10个字）
 ####
 ```yaml
-0:
-  need_fill: true
-  neutral_term: "{{公司名称}}"
-1:
-  need_fill: false
-  neutral_term: ""
-2:
-  need_fill: true
-  neutral_term: "{{日期}}"
+- col_id: 列序号
+  para_id: 段落序号
+  run_id: 段落run序号
+  run_filled_text: 回填后的文本
 ```
+
+**输入示例**
+列0:
+  - para_id=0, run_id=0, text="方案信息"
+列1:
+  - para_id=0, run_id=0, text="方案版本号及日期"
+列2:
+  <空>
+列3:
+  - para_id=0, run_id=0, text="知情同意书版本号日期"
+列4:
+  - para_id=0, run_id=0, text="/"
+列5:
+  - para_id=0, run_id=0, text="项目名称："
+
+**输出示例**
+思考1:列0没有明显的占位符，也不依赖于其他列，不需要填写中性词
+思考2:列1没有明显占位符，列2依赖列1
+思考3:列4依赖于列3
+思考4:列5有明显的占位符，且没有其他列依赖列5，需要填写中性词
+####
+```yaml
+- col_id: 2
+  para_id: 0
+  run_id: 0
+  run_filled_text: "{{方案版本号及日期}}"
+- col_id: 4
+  para_id: 0
+  run_id: 0
+  run_filled_text: "{{知情同意书版本号日期}}"
+- col_id: 5
+  para_id: 0
+  run_id: 0
+  run_filled_text: "项目名称：{{项目名称}}"
+```
+
 
 ## 现在，请分析下方表格行：
 {chr(10).join(row_texts)}
@@ -267,22 +320,46 @@ class TableRowLLMFillNode(AsyncParallelBatchNode):
         response = self.llm_client.chat_completion(user_message=prompt)
         yaml_data = self.llm_client.parse_yaml(response)
         logs = []
-        # 只处理第一次出现的cell（已去重）
-        for v_idx_str, cell_info in yaml_data.items():
-            real_col_id = virtual2real.get(v_idx_str)
-            if real_col_id is None:
-                continue
-            if cell_info.get("need_fill"):
-                neutral = cell_info.get("neutral_term", "")
+        docs = item["docs"]  # 通过prep_async传递进来
+        doc_idx = item["doc_idx"]
+        for entry in yaml_data:
+            try:
+                v_col_id = entry["col_id"]  # 大模型返回的虚拟编号
+                para_id = entry["para_id"]
+                run_id = entry["run_id"]
+                filled_text = entry["run_filled_text"]
+                if not isinstance(filled_text, str):
+                    filled_text = str(filled_text)
+                real_col_id = virtual2real[str(v_col_id)]
+                cell = docs[doc_idx]["tables"][item["table_id"]].rows[item["row_id"]].cells[real_col_id]
+                # 1. 确保有段落
+                if not cell.paragraphs:
+                    para = cell.add_paragraph()
+                elif para_id >= len(cell.paragraphs):
+                    para = cell.add_paragraph()
+                else:
+                    para = cell.paragraphs[para_id]
+                # 2. 确保有run
+                if not para.runs:
+                    run = para.add_run()
+                elif run_id >= len(para.runs):
+                    run = para.add_run()
+                else:
+                    run = para.runs[run_id]
+                run.text = filled_text
                 log = {
                     "type": "table_row",
-                    "doc_idx": item["doc_idx"],
+                    "doc_idx": doc_idx,
                     "table_id": item["table_id"],
                     "row_id": item["row_id"],
                     "col_id": real_col_id,
-                    "neutral_term": neutral
+                    "para_id": para_id,
+                    "run_id": run_id,
+                    "run_filled_text": filled_text
                 }
                 logs.append(log)
+            except Exception as e:
+                logs.append({"error": str(e), **entry})
         return {
             "type": "table_row",
             "doc_idx": item["doc_idx"],

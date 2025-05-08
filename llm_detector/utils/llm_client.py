@@ -87,7 +87,7 @@ class LLMClient:
                 return ""
                 
             result = response.choices[0].message.content.strip()
-            logger.info(f"大模型返回: {result[:200]}...")
+            logger.info(f"\n大模型返回: {result}")
             
             return result
         except Exception as e:
@@ -227,14 +227,14 @@ class LLMClient:
     #     neutral_term = yaml_data["neutral_term"]
         
     # logger.info(f"获取到中性词: {neutral_term}")
-    def parse_yaml(self, response_text: str) -> Dict[str, Any]:
+    def parse_yaml(self, response_text: str) -> Union[Dict[str, Any], List[Any]]:
         """从LLM响应中解析YAML格式数据.
         
         Args:
             response_text: 大模型返回的文本响应
             
         Returns:
-            解析后的YAML数据，如果解析失败则返回空字典
+            解析后的YAML数据，如果解析失败则返回空字典或空列表
             
         Note:
             此方法期望响应中包含```yaml和```标记的YAML代码块
@@ -250,15 +250,18 @@ class LLMClient:
                 logger.warning(f"响应中未找到YAML格式: {response_text}...")
                 return {}
                 
-            yaml_str = yaml_parts[1].split("```")[0].strip()
+            yaml_str = yaml_parts[1].split("```", 1)[0].strip()
             result = yaml.safe_load(yaml_str)
             
-            if not isinstance(result, dict):
-                logger.warning(f"解析的YAML不是字典格式: {result}")
+            if isinstance(result, dict):
+                logger.debug(f"成功解析YAML为字典: {list(result.keys())}")
+                return result
+            elif isinstance(result, list):
+                logger.debug(f"成功解析YAML为列表, 元素数: {len(result)}")
+                return result
+            else:
+                logger.warning(f"解析的YAML既不是字典也不是列表: {type(result)}")
                 return {}
-                
-            logger.debug(f"成功解析YAML: {list(result.keys())}")
-            return result
         except Exception as e:
             logger.error(f"解析YAML失败: {e}")
             return {} 
